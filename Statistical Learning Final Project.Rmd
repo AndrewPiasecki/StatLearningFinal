@@ -1,0 +1,369 @@
+---
+title: "Statistical Learning Final Project"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    theme: united
+  html_document:
+    toc: yes
+    df_print: paged
+---
+## Team Members
+**Andrew Piasecki** <br> [Email](mailto:apiasecki0881@floridapoly.edu)
+
+*That's it* 
+
+# Introduction
+
+In the field of data science, machine learning is a powerful tool for making predictions and identifying patterns in data. In this context, principal component analysis (PCA), cross-validation (CV), and support vector machines (SVM) are commonly used methods for analyzing and modeling data. In this project, we will apply these techniques to a breast cancer dataset, which contains information about various features of breast tumors and their diagnosis as malignant or benign.
+
+In addition to implementing these methods, we will also visualize the data to gain insights and explore relationships between different features. Furthermore, we will run tests to evaluate the performance of our models and compare them with each other. All of this will be done using R. Overall, this project will provide a hands-on opportunity to gain practical experience with these important machine learning techniques in the context of a real-world dataset.
+
+
+
+
+# Install and Import Packages
+```{r}
+
+# Load the required packages
+install.packages("readxl")
+install.packages("factoextra")
+install.packages("FactoMineR")
+install.packages("kernlab")
+
+library(readxl)
+library(stats)
+library(tidyverse)
+library(caret)
+library(kernlab)
+library(FactoMineR)
+library(factoextra)
+library(e1071)
+library(ggplot2)
+```
+# PCA
+
+## Reading and Preparing Data
+
+```{r}
+# Read data from a CSV file hosted on GitHub
+bc <- read.csv("https://raw.githubusercontent.com/AndrewPiasecki/Breast_Cancer/main/data.csv")
+
+# Remove non-numeric columns from the data
+data <- bc[,3:32]
+
+# Standardize the numeric columns in the data
+data_scaled <- scale(data)
+
+```
+
+## Perform PCA
+
+```{r}
+# Perform PCA on the standardized data
+pca <- prcomp(data_scaled, center = TRUE, scale. = TRUE)
+
+# Extract the principal components
+PC1 <- pca$x[, 1]
+PC2 <- pca$x[, 2]
+PC3 <- pca$x[, 3]
+PC4 <- pca$x[, 4]
+PC5 <- pca$x[, 5]
+PC6 <- pca$x[, 6]
+
+# Print a summary of the principal component analysis
+summary(pca)
+
+```
+
+## Visualizing Principal Components
+<br>
+List of Scatter Plots
+<br>
+
+- PC1 vs PC2
+- PC2 vs PC3
+- PC3 vs PC4
+- PC4 vs PC5
+- PC5 vs PC6
+- PC1 vs PC6
+
+
+
+<br><br><br><br><br><br>
+
+
+### PC1 vs PC2
+
+
+```{r}
+scatter_plotP12 <- ggplot(data, aes(x = PC1, y = PC2, color = bc$diagnosis)) +
+  geom_point() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "PC1 vs PC2", x = "PC1", y = "PC2")
+scatter_plotP12
+
+```
+
+### PC2 vs PC3
+
+```{r}
+scatter_plotP23 <- ggplot(data, aes(x = PC2, y = PC3, color = bc$diagnosis)) +
+  geom_point() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "PC2 vs PC3", x = "PC2", y = "PC3")
+scatter_plotP23
+
+```
+
+### PC3 vs PC4
+
+```{r}
+scatter_plotP34 <- ggplot(data, aes(x = PC3, y = PC4, color = bc$diagnosis)) +
+  geom_point() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "PC3 vs PC4", x = "PC3", y = "PC4")
+scatter_plotP34
+```
+
+### PC4 vs PC5
+
+```{r}
+scatter_plotP45 <- ggplot(data, aes(x = PC4, y = PC5, color = bc$diagnosis)) +
+  geom_point() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "PC4 vs PC5", x = "PC4", y = "PC5")
+scatter_plotP45
+```
+
+### PC5 vs PC6
+
+```{r}
+scatter_plotP56 <- ggplot(data, aes(x = PC5, y = PC6, color = bc$diagnosis)) +
+  geom_point() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "PC5 vs PC6", x = "PC5", y = "PC6")
+scatter_plotP56
+```
+
+### PC1 vs PC6
+
+```{r}
+scatter_plotP16 <- ggplot(data, aes(x = PC1, y = PC6, color = bc$diagnosis)) +
+  geom_point() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "PC1 vs PC6", x = "PC1", y = "PC6")
+scatter_plotP16
+```
+
+
+
+
+
+
+## Eigen Values and Scree Plot
+
+```{r}
+# Create a table showing the different eigenvalue, variance.percentm and cumulative.variance.percent of different dimensions
+get_eigenvalue(pca)
+
+# Plot a Scree Plot showing different variances at different PCA values
+fviz_eig(pca)
+```
+
+## SVM classification of PC1 and PC2
+
+```{r}
+svmPCA <- svm(PC2 ~ PC1, data = bc, kernel = "linear", cost = 10, scale = FALSE)
+summary(svmPCA)
+
+plot(svmPCA)
+```
+
+
+
+
+
+# Cross-Validation (CV)
+
+
+## Split the data into training and test set
+
+```{r}
+
+
+set.seed(123)
+training.samples <- data$radius_mean %>%
+  createDataPartition(p = 0.8, list = FALSE)
+train.data  <- data[training.samples, ]
+test.data <- data[-training.samples, ]
+
+
+```
+
+## Build The Model
+
+```{r}
+model <- lm(radius_mean ~ texture_mean, data)
+
+```
+
+## Make predictions and compute the R2, RMSE and MAE
+
+
+
+```{r}
+
+predictions <- model %>% predict(data)
+data.frame( R2 = R2(predictions, data$radius_mean),
+            RMSE = RMSE(predictions, data$radius_mean),
+            MAE = MAE(predictions, data$radius_mean))
+
+
+# A high R2 value indicates that the model is a good fit for the data.
+
+# A lower RMSE value indicates that the model is more accurate in predicting the dependent variable.
+
+#  MAE represents the average of the absolute differences between the predicted and actual values
+
+```
+
+
+When comparing two models, the one that produces the lowest test sample RMSE is the preferred model.  
+
+the RMSE and the MAE are measured in the same scale as the outcome variable. Dividing the RMSE by the average value of the outcome variable will give you the prediction error rate, which should be as small as possible:
+
+```{r}
+RMSE(predictions, data$radius_mean)/mean(data$radius_mean)
+```
+
+* I can then **plot** the model and it shows four different graphs  
+1. Residuals vs Fitted (This plot shows the relationship between the residuals (the difference between the observed values and the predicted values) and the fitted values (the predicted values).)
+2. Normal Q-Q (This plot compares the distribution of the residuals to a normal distribution. If the residuals are normally distributed, then the points on the plot will fall along a straight line. However, if there are deviations from the straight line, this may indicate that the residuals are not normally distributed, which could affect the validity of the model.)
+3. Scale-Location (The purpose of this plot is to check for heteroscedasticity, which is a violation of the assumption that the variance of the residuals is constant across all levels of the independent variables. )
+4. Residuals vs Leverage (This plot shows the leverage (a measure of how much a data point influences the regression line) plotted against the residuals. The purpose of this plot is to identify outliers or influential observations.)
+
+<br>
+
+- **Heteroscedasticity** happens when the standard deviations of a predicted variable, monitored over different values of an independent variable or as related to prior time periods, are non-constant.
+```{r}
+plot(model)
+```
+
+
+## LOOCV 
+
+
+### Define training control
+
+```{r}
+
+LOOtrain.control <- trainControl(method = "LOOCV")
+
+```
+
+### Train the model
+
+```{r}
+
+LOOmodel <- train(radius_mean ~ texture_mean, data, method = "lm",
+               trControl = LOOtrain.control)
+```
+
+### Summarize the results
+
+```{r}
+print(LOOmodel)
+```
+
+
+The advantage of the *LOOCV method* is that we make use all data points reducing potential bias.  
+
+However, the process is repeated as many times as there are data points, resulting to a higher execution time when n is extremely large.  
+
+Additionally, we test the model performance against one data point at each iteration. This might result to higher variation in the prediction error, if some data points are outliers.  
+This leads to K-fold Cross Validation  
+
+## K-fold Cross Validation
+
+### Define training control
+
+```{r}
+
+set.seed(123) 
+KFtrain.control <- trainControl(method = "cv", number = 10)
+
+```
+
+### Train the model
+
+```{r}
+
+KFmodel <- train(radius_mean ~ texture_mean, data, method = "lm",
+               trControl = KFtrain.control)
+
+```
+
+### Summarize the results
+
+```{r}
+
+print(KFmodel)
+```
+
+
+# Module PCA txt
+
+```{r}
+
+X <- as.matrix(data[, -1]) # remove the first column (car names) and
+
+y <- data[, 1] # extract the first column (mpg)
+pca <- prcomp(X, scale = TRUE)
+prop.var <- pca$sdev^2 / sum(pca$sdev^2)
+cum.prop.var <- cumsum(prop.var)
+num.components <- sum(cum.prop.var < 0.9) # choose the number of
+
+
+Z <- pca$x[, 1:num.components]
+model <- lm(y ~ Z)
+plot(model)
+summary(model)
+
+X_new <- X[1:5, ] # use the first 5 rows of the data as new predictors
+
+
+Z_new <- predict(pca, newdata = X_new)[, 1:num.components] # project the
+
+summary(Z_new)
+
+
+# Normal Q-Q - A normal Q-Q plot (or quantile-quantile plot) is a graphical tool used to check whether a set of data follows a normal distribution. In this plot, the ordered values of the data are plotted against the corresponding expected values of a normal distribution. If the data follows a normal distribution, the points in the plot should fall approximately along a straight line.
+
+```
+
+
+
+
+
+
+
+
+# Conclusion
+
+In this project, we performed principal component analysis (PCA) on a dataset of [breast cancer](https://raw.githubusercontent.com/AndrewPiasecki/Breast_Cancer/main/data.csv). After standardizing the data, we performed PCA and extracted the first six principal components. We then visualized the first six principal components using scatter plots. In addition, we created a scree plot to visualize the eigenvalues of the principal components.
+
+The results showed that the first two principal components explained a significant amount of the variance in the data, compared to the rest of the principal components. Overall, this project demonstrates the usefulness of PCA in reducing the dimensionality of a dataset and identifying the most important variables.

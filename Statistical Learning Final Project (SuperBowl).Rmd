@@ -1,0 +1,432 @@
+---
+title: "Statistical Learning Final Project"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    theme: united
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+
+# Install and Import Packages
+```{r}
+
+# Load the required packages
+install.packages("readxl")
+install.packages("factoextra")
+install.packages("FactoMineR")
+install.packages("kernlab")
+
+library(readxl)
+library(stats)
+library(tidyverse)
+library(caret)
+library(kernlab)
+library(FactoMineR)
+library(factoextra)
+library(e1071)
+library(ggplot2)
+```
+
+# Import Data Set
+
+```{r}
+
+data <- read_csv("https://raw.githubusercontent.com/reisanar/datasets/master/super_bowl.csv")
+```
+
+
+
+
+# Make Data Frame
+
+**This will help simplify binary operations**
+
+```{r}
+Date <- data$Date
+SB <- data$SB
+Attendance <- data$Attendance
+QB_Winner <- data$QB_Winner
+Coach_Winner <- data$Coach_Winner
+Winner <- data$Winner
+Winning_Pts <- data$Winning_Pts
+QB_Loser <- data$QB_Loser
+Coach_Loser <- data$Coach_Loser
+Loser <- data$Loser
+Losing_Pts <- data$Losing_Pts
+MVP <- data$MVP
+Stadium <- data$Stadium
+City <- data$City
+State <- data$State
+Point_Difference <- data$Point_Difference
+Referee <- data$Referee
+Umpire <- data$Umpire
+Head_Linesman <- data$Head_Linesman
+Line_Judge <- data$Line_Judge
+Field_Judge <- data$Field_Judge
+Back_Judge <- data$Back_Judge
+Side_Judge <- data$Side_Judge
+
+
+Average_Points <- (sum(data$Winning_Pts) + sum(data$Losing_Pts)) / 52
+Average_Points
+
+
+DataFrame <- data.frame(Date,SB,Attendance,QB_Winner,Coach_Winner,Winner,Winning_Pts,QB_Loser,Coach_Loser,Loser,Losing_Pts,MVP,Stadium,City,State,Point_Difference,Referee,Umpire,Head_Linesman,Line_Judge,Field_Judge,Back_Judge,Side_Judge)
+
+
+```
+
+
+
+# PCA (Principal-Component Analysis)
+
+
+
+## Utilizing prcomp to reduce dimensionality
+
+### Select the columns you want to use for PCA
+```{r}
+
+
+selected_cols <- c("Attendance", "Winning_Pts", "Losing_Pts", "Point_Difference")
+
+```
+
+### Subset the data using the selected columns
+
+```{r}
+
+data_subset <- data[selected_cols]
+
+
+```
+
+### Perform PCA
+
+```{r}
+
+pca <- prcomp(data_subset, scale = TRUE)
+
+
+```
+
+### Extract the principal components
+
+```{r}
+
+pcs <- pca$x
+
+
+```
+
+### Print the principal components
+
+```{r}
+
+print(pcs)
+```
+
+
+
+
+
+## PCA Graphing
+
+
+*PCA* includes many different graphing techniques, which is shown below: 
+
+- **get_eigenvalue(res.pca)**: Extract the eigenvalues/variances of principal components
+- **fviz_eig(res.pca)**: Visualize the eigenvalues
+- **get_pca_ind(res.pca)**, **get_pca_var(res.pca)**: Extract the results for individuals and variables, respectively.
+- **fviz_pca_ind(res.pca)**, **fviz_pca_var(res.pca)**: Visualize the results individuals and variables, respectively.
+- **fviz_pca_biplot(res.pca)**: Make a biplot of individuals and variables.
+
+## Perform PCA and Plots the Variable and Individuals Graph
+
+```{r}
+
+
+pca <- PCA(data_subset, scale.unit = TRUE, ncp = 5)
+```
+
+## Grab the EigenValues/variance and Scree Plot
+
+```{r}
+
+get_eigenvalue(pca)
+fviz_eig(pca)
+```
+
+
+
+## Plot a Biplot
+
+```{r}
+
+fviz_pca_biplot(pca)
+
+```
+
+
+
+# Cross-Validation (CV)
+
+
+## Split the data into training and test set
+
+```{r}
+
+
+set.seed(123)
+training.samples <- data$Winning_Pts %>%
+  createDataPartition(p = 0.8, list = FALSE)
+train.data  <- data[training.samples, ]
+test.data <- data[-training.samples, ]
+
+
+```
+
+## Build The Model
+
+```{r}
+model <- lm(Winning_Pts ~ Losing_Pts, data)
+
+```
+
+## Make predictions and compute the R2, RMSE and MAE
+
+```{r}
+
+predictions <- model %>% predict(data)
+data.frame( R2 = R2(predictions, data$Winning_Pts),
+            RMSE = RMSE(predictions, data$Winning_Pts),
+            MAE = MAE(predictions, data$Winning_Pts))
+```
+
+## Summarize the model
+
+```{r}
+plot(model)
+```
+
+
+When comparing two models, the one that produces the lowest test sample RMSE is the preferred model.  
+
+the RMSE and the MAE are measured in the same scale as the outcome variable. Dividing the RMSE by the average value of the outcome variable will give you the prediction error rate, which should be as small as possible:
+
+```{r}
+RMSE(predictions, data$Winning_Pts)/mean(data$Winning_Pts)
+```
+
+* I can then **plot** the model and it shows four different graphs  
+1. Residuals vs Fitted
+2. Normal Q-Q
+3. Scale-Location
+4. Residuals vs Leverage
+
+```{r}
+plot(model)
+```
+
+
+## LOOCV 
+
+
+### Define training control
+
+```{r}
+
+train.control <- trainControl(method = "LOOCV")
+
+```
+
+### Train the model
+
+```{r}
+
+model <- train(Winning_Pts ~ Losing_Pts, data, method = "lm",
+               trControl = train.control)
+```
+
+### Summarize the results
+
+```{r}
+
+print(model)
+```
+
+
+
+
+
+
+
+
+The advantage of the *LOOCV method* is that we make use all data points reducing potential bias.  
+
+However, the process is repeated as many times as there are data points, resulting to a higher execution time when n is extremely large.  
+
+Additionally, we test the model performance against one data point at each iteration. This might result to higher variation in the prediction error, if some data points are outliers.  
+This leads to K-fold Cross Validation  
+
+## K-fold Cross Validation
+
+### Define training control
+
+```{r}
+
+set.seed(123) 
+train.control <- trainControl(method = "cv", number = 10)
+
+```
+
+### Train the model
+
+```{r}
+
+model <- train(Winning_Pts ~ Losing_Pts, data, method = "lm",
+               trControl = train.control)
+
+```
+
+### Summarize the results
+
+```{r}
+
+print(model)
+```
+
+
+
+# SVM
+
+```{r}
+
+
+
+# plot with ggplot2
+ggplot(data, aes(x = SB)) +
+  geom_point(aes(y = Winning_Pts, color = "Winning Points")) +
+  geom_point(aes(y = Losing_Pts, color = "Losing Points")) +
+  scale_color_manual(values = c("Winning Points" = "blue", "Losing Points" = "red")) +
+  labs(x = "Game Number", y = "Points Scored", color = "Points Type") +
+  guides(x = guide_axis(angle = 90)) +
+  theme_classic() +
+  geom_abline(slope = -svm_model$coef[1, 1]/svm_model$coef[1, 2], intercept = -svm_model$rho/ svm_model$coef[1, 2], linetype = "dashed", color = "blue")
+
+
+
+```
+
+
+```{r}
+
+
+
+
+bc <- read.csv("https://raw.githubusercontent.com/AndrewPiasecki/Fake_Bills/main/data.csv")
+
+
+
+# Step 2: Remove non-numeric columns
+data <- bc[,3:32]
+
+# Step 3: Standardize the numeric columns
+data_scaled <- scale(data)
+
+
+# Step 4: Perform PCA on the standardized data
+pca <- prcomp(data_scaled, center = TRUE, scale. = TRUE)
+
+# Step 5: Extract the principal components
+summary(pca)
+
+plot(pca)
+
+PC1 <- pca$x[, 1]
+PC2 <- pca$x[, 2]
+PC3 <- pca$x[, 3]
+PC4 <- pca$x[, 4]
+PC5 <- pca$x[, 5]
+PC6 <- pca$x[, 6]
+
+scatter_plotP12 <- ggplot(data, aes(x = PC1, y = PC2, color = bc$diagnosis)) +
+  geom_point() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "PC1 vs PC2", x = "PC1", y = "PC2")
+scatter_plotP12
+
+scatter_plotP23 <- ggplot(data, aes(x = PC2, y = PC3, color = bc$diagnosis)) +
+  geom_point() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "PC2 vs PC3", x = "PC2", y = "PC3")
+scatter_plotP23
+
+scatter_plotP34 <- ggplot(data, aes(x = PC3, y = PC4, color = bc$diagnosis)) +
+  geom_point() +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "PC3 vs PC4", x = "PC3", y = "PC4")
+scatter_plotP34
+
+
+
+
+get_eigenvalue(pca)
+fviz_eig(pca)
+
+# Scree Plot shows how much variation of PCA captures from the data
+
+fviz_pca_biplot(pca)
+
+
+
+svmPCA <- svm(PC2 ~ PC1, data = bc, kernel = "linear", cost = 10, scale = FALSE)
+summary(svmPCA)
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+# Conclusion
+
+[To Be Written]
+
+
+
+
+
+
+# Cited Sources
+
+[PCA](http://www.sthda.com/english/articles/31-principal-component-methods-in-r-practical-guide/112-pca-principal-component-analysis-essentials/)
+
+[SVM](http://www.sthda.com/english/articles/36-classification-methods-essentials/144-svm-model-support-vector-machine-essentials/)
+
+
+
+
+
+
+
+
+
